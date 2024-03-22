@@ -771,22 +771,11 @@ class NodeParser(BaseParser):
         self._inputs, input_defaults, self._outputs = self.parse_func_signature(self._funcdef)
         idx = self._parse_special_blocks(self._funcdef.body)
         self._resolve_special_outputs()
-        self._signature = Signature(
-            self._name,
-            self._inputs,
-            self._outputs + self._special_outputs,
-            input_defaults,
-            special_outputs=self._special_outputs,
-        )
+        self._signature = Signature(self._name, self._inputs, self._outputs + self._special_outputs, input_defaults,  special_outputs=self._special_outputs)
         # Up front initialize timeseries inputs as local vars.  Regular TS need two vars, the proxy and
         # the python value instance. Baskets will only need the proxy.  We also provide a noderef for node
         # specific methods.  Values are assigned to tuple( name, index ) which is replaced in PyNode.cpp init
-        node_proxy = [
-            ast.Assign(
-                targets=[self._node_proxy_expr(ast.Store())],
-                value=ast.Tuple(elts=[ast.Str(self._NODE_P_VARNAME), ast.Num(n=0)], ctx=ast.Load()),
-            )
-        ]  # '#nodep'
+        node_proxy = [ast.Assign(targets=[self._node_proxy_expr(ast.Store())], value=ast.Tuple(elts=[ast.Str(self._NODE_P_VARNAME), ast.Num(n=0)], ctx=ast.Load()))]  # '#nodep'
         ts_in_proxies = []
         ts_out_proxies = []
         ts_vars = []
@@ -794,35 +783,14 @@ class NodeParser(BaseParser):
         for inp in self._inputs:
             if inp.kind.is_any_ts():
                 proxy = self._ts_inproxy_expr(inp.ts_idx, ast.Store())  # '#inp_%d' % inp.ts_idx
-                ts_in_proxies.append(
-                    ast.Assign(
-                        targets=[proxy],
-                        value=ast.Tuple(
-                            elts=[ast.Str(s=self._INPUT_PROXY_VARNAME), ast.Num(n=inp.ts_idx)], ctx=ast.Load()
-                        ),
-                    )
-                )
+                ts_in_proxies.append(ast.Assign(targets=[proxy], value=ast.Tuple(elts=[ast.Str(s=self._INPUT_PROXY_VARNAME), ast.Num(n=inp.ts_idx)], ctx=ast.Load())))
                 if not inp.kind.is_basket():
-                    ts_vars.append(
-                        ast.Assign(
-                            targets=[ast.Name(id=inp.name, ctx=ast.Store())],
-                            value=ast.Tuple(
-                                elts=[ast.Str(s=self._INPUT_VAR_VARNAME), ast.Num(n=inp.ts_idx)], ctx=ast.Load()
-                            ),
-                        )
-                    )
+                    ts_vars.append(ast.Assign(targets=[ast.Name(id=inp.name, ctx=ast.Store())], value=ast.Tuple(elts=[ast.Str(s=self._INPUT_VAR_VARNAME), ast.Num(n=inp.ts_idx)], ctx=ast.Load())))
 
         for output in self._signature._outputs:
-            name = f"#outp_{output.ts_idx}"
+            name = f'#outp_{output.ts_idx}'
             # ts_out_proxies.append( ast.Expr( value=ast.Name( id = name, ctx = ast.Load() ) ) )
-            ts_out_proxies.append(
-                ast.Assign(
-                    targets=[ast.Name(id=name, ctx=ast.Store())],
-                    value=ast.Tuple(
-                        elts=[ast.Str(s=self._OUTPUT_PROXY_VARNAME), ast.Num(n=output.ts_idx)], ctx=ast.Load()
-                    ),
-                )
-            )
+            ts_out_proxies.append(ast.Assign(targets=[ast.Name(id=name, ctx=ast.Store())], value=ast.Tuple(elts=[ast.Str(s=self._OUTPUT_PROXY_VARNAME), ast.Num(n=output.ts_idx)], ctx=ast.Load())))
 
         # innerbody is the while loop.  Start off with a yield, will get called when something ticks
         innerbody = [ast.Expr(value=ast.Yield(value=None))]
@@ -841,23 +809,27 @@ class NodeParser(BaseParser):
         self._startblock = [self.visit(node) for node in self._startblock]
 
         init_block = node_proxy + ts_in_proxies + ts_out_proxies + ts_vars
-
-        # Yield before start block so we can setup stack frame before executing
-        startblock = [ast.Expr(value=ast.Yield(value=None))] + self._stateblock + self._startblock
-
-        start_and_body = startblock + [ast.While(test=ast.NameConstant(value=True), orelse=[], body=innerbody)]
+        startblock = self._stateblock + self._startblock
+        body = [ast.While(test=ast.NameConstant(value=True), orelse=[], body=innerbody)]
 
         if self._stopblock:
             self._stopblock = [self.visit(node) for node in self._stopblock]
-            # For stop we wrap start and body in a try / finally ( not the init block, if that fails it's unrecoverable )
-            start_and_body = [ast.Try(body=start_and_body, finalbody=self._stopblock, handlers=[], orelse=[])]
 
+            # For stop we wrap the body of a node in a try / finally
+            # If the init block fails it's unrecoverable, and if the start block raises we don't want to stop that specific node
+            start_and_body = startblock + [ast.Try(body=body, finalbody=self._stopblock, handlers=[], orelse=[])]
+        
+        else:
+            start_and_body = startblock + body
+
+        # Yield before start block so we can setup stack frame before executing
+        # However, this initial yield shouldn't be within the try-finally block, since if a node does not start, it's stop() logic should not be invoked
+        # This avoids an issue where one node raises an exception upon start(), and then other nodes execute their stop() without having ever started
+        start_and_body = [ast.Expr(value=ast.Yield(value=None))] + start_and_body
         newbody = init_block + start_and_body
 
         newfuncdef = ast.FunctionDef(name=self._name, body=newbody, returns=None)
-        newfuncdef.args = self._create_ast_args(
-            posonlyargs=[], args=[], kwonlyargs=[], defaults=[], vararg=None, kwarg=None, kw_defaults=[]
-        )
+        newfuncdef.args = self._create_ast_args(posonlyargs=[], args=[], kwonlyargs=[], defaults=[], vararg=None, kwarg=None, kw_defaults=[])
         newfuncdef.decorator_list = []
 
         # Scalars become the only args to the generator
@@ -865,7 +837,6 @@ class NodeParser(BaseParser):
 
         if self._DEBUG_PARSE or self._debug_print:
             import astor
-
             print(astor.to_source(newfuncdef))
 
         ast.fix_missing_locations(newfuncdef)
