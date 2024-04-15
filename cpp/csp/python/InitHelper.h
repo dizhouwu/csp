@@ -20,7 +20,7 @@ public:
 
     bool registerCallback( InitCallback cb );
 
-    static InitCallback typeInitCallback( PyTypeObject * pyType, std::string name );
+    static InitCallback typeInitCallback( PyTypeObject * pyType, std::string name, PyTypeObject * baseType = nullptr );
     static InitCallback moduleMethodsCallback( PyMethodDef * methods );
     static InitCallback moduleMethod( const char * name, PyCFunction func, int flags, const char * doc );
 
@@ -50,9 +50,11 @@ inline InitHelper & InitHelper::instance()
     return s_instance;
 }
 
-inline InitHelper::InitCallback InitHelper::typeInitCallback( PyTypeObject * pyType, std::string name )
+inline InitHelper::InitCallback InitHelper::typeInitCallback( PyTypeObject * pyType, std::string name, PyTypeObject * baseType )
 {
-    InitCallback cb = [pyType,name]( PyObject * module ) {
+    InitCallback cb = [pyType,name,baseType]( PyObject * module ) {
+        if( baseType )
+            pyType -> tp_base = baseType;
         if( PyType_Ready( pyType ) < 0 )
             return false;
 
@@ -77,7 +79,7 @@ inline InitHelper::InitCallback InitHelper::moduleMethodsCallback( PyMethodDef *
 
 inline InitHelper::InitCallback InitHelper::moduleMethod( const char * name, PyCFunction func, int flags, const char * doc )
 {
-    PyMethodDef defs[2]{ { name, func, flags, doc }, nullptr };
+    PyMethodDef defs[2]{ { name, func, flags, doc }, { nullptr } };
 
     //Note that we rely on the lambda closure to keep the lifetime of defs which is kept by ptr
     //m_callbacks will keep the InitCallback around for the life of the program
