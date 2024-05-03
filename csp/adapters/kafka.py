@@ -15,7 +15,13 @@ from csp.adapters.utils import (
     RawTextMessageMapper,
 )
 from csp.impl.wiring import input_adapter_def, output_adapter_def, status_adapter_def
-from csp.lib import _kafkaadapterimpl
+
+try:
+    _HAS_KAFKA_ADAPTER = True
+    from csp.lib import _kafkaadapterimpl
+except ImportError:
+    _HAS_KAFKA_ADAPTER = False
+    _kafkaadapterimpl = None
 
 _ = BytesMessageProtoMapper, DateTimeType, JSONTextMessageMapper, RawBytesMessageMapper, RawTextMessageMapper
 T = typing.TypeVar("T")
@@ -65,6 +71,9 @@ class KafkaAdapterManager:
         :param group_id_prefix - ( optional ) when not passing an explicit group_id, a prefix can be supplied that will be use to
                             prefix the UUID generated for the group_id
         """
+        if not _HAS_KAFKA_ADAPTER:
+            raise ModuleNotFoundError("`csp` build does not include kafka C++ adapter")
+
         if group_id is not None and start_offset is not None:
             raise ValueError("start_offset is not supported when consuming with group_id")
 
@@ -184,19 +193,23 @@ class KafkaAdapterManager:
         return _kafkaadapterimpl._kafka_adapter_manager(engine, self._properties)
 
 
-_kafka_input_adapter_def = input_adapter_def(
-    "kafka_input_adapter",
-    _kafkaadapterimpl._kafka_input_adapter,
-    ts["T"],
-    KafkaAdapterManager,
-    typ="T",
-    properties=dict,
-)
-_kafka_output_adapter_def = output_adapter_def(
-    "kafka_output_adapter",
-    _kafkaadapterimpl._kafka_output_adapter,
-    KafkaAdapterManager,
-    input=ts["T"],
-    typ="T",
-    properties=dict,
-)
+if _HAS_KAFKA_ADAPTER:
+    _kafka_input_adapter_def = input_adapter_def(
+        "kafka_input_adapter",
+        _kafkaadapterimpl._kafka_input_adapter,
+        ts["T"],
+        KafkaAdapterManager,
+        typ="T",
+        properties=dict,
+    )
+    _kafka_output_adapter_def = output_adapter_def(
+        "kafka_output_adapter",
+        _kafkaadapterimpl._kafka_output_adapter,
+        KafkaAdapterManager,
+        input=ts["T"],
+        typ="T",
+        properties=dict,
+    )
+else:
+    _kafka_input_adapter_def = None
+    _kafka_output_adapter_def = None

@@ -15,7 +15,14 @@ from csp.impl.types.tstype import ts
 from csp.impl.types.typing_utils import CspTypingUtils
 from csp.impl.wiring import input_adapter_def, status_adapter_def
 from csp.impl.wiring.node import node
-from csp.lib import _parquetadapterimpl
+
+try:
+    _HAS_PARQUET_ADAPTER = True
+    from csp.lib import _parquetadapterimpl
+except ImportError:
+    _HAS_PARQUET_ADAPTER = False
+    _parquetadapterimpl = None
+
 
 __all__ = [
     "ParquetOutputConfig",
@@ -287,6 +294,9 @@ class ParquetReader:
         return _parquetadapterimpl._parquet_input_adapter_manager(engine, self._properties, self._filenames_gen)
 
 
-_parquet_input_adapter_def = input_adapter_def(
-    "parquet_adapter", _parquetadapterimpl._parquet_input_adapter, ts["T"], ParquetReader, typ="T", properties=dict
-)
+if _HAS_PARQUET_ADAPTER:
+    _parquet_input_adapter_def = input_adapter_def(
+        "parquet_adapter", _parquetadapterimpl._parquet_input_adapter, ts["T"], ParquetReader, typ="T", properties=dict
+    )
+else:
+    _parquet_input_adapter_def = None
