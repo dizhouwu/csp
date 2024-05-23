@@ -25,8 +25,9 @@ try:
     _HAS_WS_ADAPTER = True
     from csp.lib import _websocketadapterimpl
 except ImportError:
-    _HAS_WS_ADAPTER = False
-    _websocketadapterimpl = None
+    raise ImportError(
+        "csp's websocket adapter requires the C++ csp extension to be built, but it could not be imported"
+    )
 
 from .websocket_types import WebsocketHeaderUpdate
 
@@ -45,14 +46,14 @@ try:
     import tornado.web
     import tornado.websocket
 except ImportError:
-    raise ImportError("websocket adapter requires tornado package")
+    raise ModuleNotFoundError("csp's websocket adapter requires `tornado`")
 
 try:
     import rapidjson
 
     datetime_mode = rapidjson.DM_UNIX_TIME | rapidjson.DM_NAIVE_IS_UTC
 except ImportError:
-    raise ImportError("websocket adapter requires rapidjson package")
+    raise ModuleNotFoundError("csp's websocket adapter requires `rapidjson`")
 
 
 def diff_dict(old, new):

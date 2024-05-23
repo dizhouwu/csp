@@ -23,7 +23,7 @@ try:
 
     _HAVE_SLACK_SDK = True
 except ImportError:
-    _HAVE_SLACK_SDK = False
+    raise ModuleNotFoundError("csp's slack adapter requires `slack-sdk`")
 
 T = TypeVar("T")
 log = getLogger(__file__)

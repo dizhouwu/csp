@@ -28,8 +28,7 @@ try:
 
     _HAS_SQLALCHEMY = True
 except (PackageNotFoundError, ValueError, TypeError, ImportError):
-    _HAS_SQLALCHEMY = False
-    db = None
+    raise ModuleNotFoundError("csp's db adapter requires `sqlalchemy`")
 
 
 class TimeAccessor(ABC):

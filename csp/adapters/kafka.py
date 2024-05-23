@@ -20,8 +20,7 @@ try:
     _HAS_KAFKA_ADAPTER = True
     from csp.lib import _kafkaadapterimpl
 except ImportError:
-    _HAS_KAFKA_ADAPTER = False
-    _kafkaadapterimpl = None
+    raise ImportError("csp's kafka adapter requires the C++ csp extension to be built, but it could not be imported")
 
 _ = BytesMessageProtoMapper, DateTimeType, JSONTextMessageMapper, RawBytesMessageMapper, RawTextMessageMapper
 T = typing.TypeVar("T")

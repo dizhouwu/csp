@@ -20,8 +20,7 @@ try:
     _HAS_PARQUET_ADAPTER = True
     from csp.lib import _parquetadapterimpl
 except ImportError:
-    _HAS_PARQUET_ADAPTER = False
-    _parquetadapterimpl = None
+    raise ImportError("csp's parquet adapter requires the C++ csp extension to be built, but it could not be imported")
 
 
 __all__ = [
