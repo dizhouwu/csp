@@ -17,7 +17,6 @@ from csp.impl.wiring import input_adapter_def, status_adapter_def
 from csp.impl.wiring.node import node
 
 try:
-    _HAS_PARQUET_ADAPTER = True
     from csp.lib import _parquetadapterimpl
 except ImportError:
     raise ImportError("csp's parquet adapter requires the C++ csp extension to be built, but it could not be imported")
@@ -293,9 +292,6 @@ class ParquetReader:
         return _parquetadapterimpl._parquet_input_adapter_manager(engine, self._properties, self._filenames_gen)
 
 
-if _HAS_PARQUET_ADAPTER:
-    _parquet_input_adapter_def = input_adapter_def(
-        "parquet_adapter", _parquetadapterimpl._parquet_input_adapter, ts["T"], ParquetReader, typ="T", properties=dict
-    )
-else:
-    _parquet_input_adapter_def = None
+_parquet_input_adapter_def = input_adapter_def(
+    "parquet_adapter", _parquetadapterimpl._parquet_input_adapter, ts["T"], ParquetReader, typ="T", properties=dict
+)

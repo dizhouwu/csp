@@ -22,7 +22,6 @@ from csp.impl.wiring import input_adapter_def, output_adapter_def, status_adapte
 from csp.impl.wiring.delayed_node import DelayedNodeWrapperDef
 
 try:
-    _HAS_WS_ADAPTER = True
     from csp.lib import _websocketadapterimpl
 except ImportError:
     raise ImportError(
@@ -406,9 +405,6 @@ class WebsocketAdapterManager:
         headers: Dict[str, str] = None
             headers to apply to the request during the handshake
         """
-        if not _HAS_WS_ADAPTER:
-            raise ModuleNotFoundError("`csp` build does not include websocket C++ adapter")
-
         assert reconnect_interval >= timedelta(seconds=1)
         self._properties = dict(
             uri=uri,
@@ -455,30 +451,25 @@ class WebsocketAdapterManager:
         return _websocketadapterimpl._websocket_adapter_manager(engine, self._properties)
 
 
-if _HAS_WS_ADAPTER:
-    _websocket_input_adapter_def = input_adapter_def(
-        "websocket_input_adapter",
-        _websocketadapterimpl._websocket_input_adapter,
-        ts["T"],
-        WebsocketAdapterManager,
-        typ="T",
-        properties=dict,
-    )
+_websocket_input_adapter_def = input_adapter_def(
+    "websocket_input_adapter",
+    _websocketadapterimpl._websocket_input_adapter,
+    ts["T"],
+    WebsocketAdapterManager,
+    typ="T",
+    properties=dict,
+)
 
-    _websocket_output_adapter_def = output_adapter_def(
-        "websocket_output_adapter",
-        _websocketadapterimpl._websocket_output_adapter,
-        WebsocketAdapterManager,
-        input=ts["T"],
-    )
+_websocket_output_adapter_def = output_adapter_def(
+    "websocket_output_adapter",
+    _websocketadapterimpl._websocket_output_adapter,
+    WebsocketAdapterManager,
+    input=ts["T"],
+)
 
-    _websocket_header_update_adapter_def = output_adapter_def(
-        "websocket_header_update_adapter",
-        _websocketadapterimpl._websocket_header_update_adapter,
-        WebsocketAdapterManager,
-        input=ts[List[WebsocketHeaderUpdate]],
-    )
-else:
-    _websocket_input_adapter_def = None
-    _websocket_output_adapter_def = None
-    _websocket_header_update_adapter_def = None
+_websocket_header_update_adapter_def = output_adapter_def(
+    "websocket_header_update_adapter",
+    _websocketadapterimpl._websocket_header_update_adapter,
+    WebsocketAdapterManager,
+    input=ts[List[WebsocketHeaderUpdate]],
+)
